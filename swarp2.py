@@ -21,7 +21,11 @@ ps = PlotSequence('dx')
 h,w  = 49,49
 xx,yy = np.meshgrid(np.arange(w), np.arange(h))
 
-N1 = N2 = 25
+#N1 = N2 = 25
+N1 = 25
+N2 = 23
+
+alanczos = False
 
 ocen  = np.zeros((N1,N2))
 odcen = np.zeros((N1,N2))
@@ -99,7 +103,11 @@ for ii,ox in enumerate(OX):
 
         # output WCS is in swarp.conf -- CRVAL 0,0
 
-        cmd = 'swarp -c swarp.conf input1.fits'
+        if alanczos:
+            resamp = 'ALANCZOS3'
+        else:
+            resamp = 'LANCZOS3'
+        cmd = 'swarp -c swarp.conf -RESAMPLING_TYPE %s input1.fits' % resamp
         rtn = os.system(cmd)
         #print('Return:', rtn)
         assert(rtn == 0)
@@ -185,6 +193,23 @@ for name,img in [('centroid', ocen), ('dcen3x3', odcen),
     plt.colorbar()
     ps.savefig()
 
+
+plt.clf()
+for name,img in [('centroid', ocen),
+                 ('SE x_image', osecen), ('SE xwin_image', osewcen),
+                 ('Tractor (w/ correct PSF)', otcen)]:
+    mean = np.mean(img - ic, axis=0)
+    std  = np.std (img - ic, axis=0)
+    plt.errorbar(DX, mean, yerr=std, fmt='.-', label=name)
+plt.xlabel('Subpixel shift (pixels)')
+plt.ylabel('Centroid error (pixels)')
+if alanczos:
+    plt.title('Astrometric-Lanczos-3 shift')
+else:
+    plt.title('Vanilla Lanczos-3 shift')
+plt.legend(loc='upper right')
+ps.savefig()
+    
 plt.clf()
 plt.imshow(odcen - ocen, interpolation='nearest', origin='lower',
            extent=[DX.min(), DX.max(), OX.min(), OX.max()],

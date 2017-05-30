@@ -49,6 +49,7 @@ for dx,dy in zip(DX,DY):
     # output WCS is in swarp.conf -- CRVAL 0,0
 
     cmd = 'swarp -c swarp.conf input1.fits'
+    print('Running:', cmd)
     rtn = os.system(cmd)
     print('Return:', rtn)
 

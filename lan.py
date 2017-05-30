@@ -17,7 +17,7 @@ subsampling = 256
 
 #xx = np.arange(-4., 3+1.).astype(np.float32)
 xx = np.arange(-6., 5+1.).astype(np.float32)
-xx += 0.5 * (1./subsampling)
+#xx += 0.5 * (1./subsampling)
 
 lanczos_kernel = np.zeros((len(xx) * subsampling))
 lanczos5_kernel = np.zeros((len(xx) * subsampling))
@@ -113,6 +113,16 @@ R = np.linalg.lstsq(A, fixed_xi - DX)
 poly = R[0]
 print('Fitting polynomial:', poly)
 
+
+# # Read off a piecewise linear relation
+# nn = 8
+# dxsup = np.hstack((DX, [1.0]))
+# fxsup = np.hstack((fixed_xi - DX, [fixed_xi[0]-DX[0]]))
+# print('aug DX', dxsup)
+# print('aug fx', fxsup)
+
+
+
 for i,dx in enumerate(DX):
     fx = np.sum([a * dx**j for j,a in enumerate(poly)])
     rtn = lanczos3_filter(xx + dx + fx, L)
@@ -177,12 +187,13 @@ for i,a in enumerate(poly):
     fipoly += a * DX**i
     
 plt.clf()
-plt.plot(DX, fixed_x - DX, 'g-')
-plt.plot(DX, fixed_x2 - DX, 'r-')
-plt.plot(DX, fixed_xi - DX, 'm-')
-plt.plot(DX, fipoly, 'b-')
+#plt.plot(DX, fixed_x - DX, 'g-')
+#plt.plot(DX, fixed_x2 - DX, 'r-', lw=3)
+plt.plot(DX, fixed_xi - DX, 'm-', label='x_i')
+plt.plot(DX, fipoly, 'b-', label='polynomial')
 plt.xlabel('subpixel offset (pixels)')
 plt.ylabel('"fixed" Lanczos argument correction (pixels)')
+plt.legend(loc='upper right')
 ps.savefig()
 
 F0 = np.fft.rfft(lanczos_kernel)

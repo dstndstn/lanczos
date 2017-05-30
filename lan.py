@@ -31,10 +31,14 @@ fixed_x = np.zeros(subsampling)
 fixed_x2 = np.zeros(subsampling)
 fixed_xi = np.zeros(subsampling)
 
+cenu = np.zeros(subsampling)
 cen0 = np.zeros(subsampling)
 cen1 = np.zeros(subsampling)
 cen2 = np.zeros(subsampling)
 ceni = np.zeros(subsampling)
+
+cenp = np.zeros(subsampling)
+fixedp_kernel = np.zeros((len(xx) * subsampling))
 
 DX = np.linspace(0, 1, subsampling, endpoint=False)
 for i,dx in enumerate(DX):
@@ -42,6 +46,9 @@ for i,dx in enumerate(DX):
     rtn = lanczos3_filter(xx + dx, L)
     assert(rtn == 0)
     lanczos_kernel[i::subsampling] = L
+
+    cenu[i] = -np.sum(L * xx)
+
     L /= L.sum()
 
     L5 = np.zeros_like(xx)
@@ -81,19 +88,40 @@ for i,dx in enumerate(DX):
     print('centroid', centroid, 'vs', dx)
     cen2[i] = centroid
 
-    fxi = fx2
+    fxi = dx
     for ii in range(8):
-        fxi = fxi - (centroid - dx)
-        print('dx', dx, 'fx', fx, 'fx2', fx2, 'fxi', fxi)
         rtn = lanczos3_filter(xx + fxi, L)
         assert(rtn == 0)
         L /= L.sum()
-        #Lsum = np.sum(L)
+        centroid = -np.sum(L * xx)
+        fxinext = fxi - (centroid - dx)
+        print('  dx %.8f -> centroid %.8f (err %8.2g) via fxi %.8f, fxi_next %.8f' %
+              (dx, centroid, centroid-dx, fxi, fxinext))
+
         fixedi_kernel[i::subsampling] = L
         fixed_xi[i] = fxi
-        centroid = -np.sum(L * xx)
         ceni[i] = centroid
-    
+
+        fxi = fxinext
+
+# Fit a polynomial expansion to fixed_xi
+NP = 10
+A = np.zeros((len(DX), NP+1))
+for i in range(NP+1):
+    A[:,i] = DX**i
+R = np.linalg.lstsq(A, fixed_xi - DX)
+poly = R[0]
+print('Fitting polynomial:', poly)
+
+for i,dx in enumerate(DX):
+    fx = np.sum([a * dx**j for j,a in enumerate(poly)])
+    rtn = lanczos3_filter(xx + dx + fx, L)
+    assert(rtn == 0)
+    L /= L.sum()
+    centroid = -np.sum(L * xx)
+    cenp[i] = centroid
+    fixedp_kernel[i::subsampling] = L
+
 print('subx', subx.min(), subx.max())
 
 plt.clf()
@@ -101,6 +129,7 @@ plt.plot(subx, lanczos_kernel, 'b-', lw=3, alpha=0.5, label='Lanczos-3')
 #plt.plot(fixed_kernel, 'r-')
 plt.plot(subx, fixed2_kernel, 'r-', label='"fixed(2)"')
 plt.plot(subx, fixedi_kernel, 'm-', label='"fixed(5)"')
+plt.plot(subx, fixedp_kernel, '-', color='0.5', label='"fixed(poly)"')
 plt.plot(subx, lanczos5_kernel, 'g-', alpha=0.5, label='Lanczos-5')
 #plt.xlim(-3.5, 3.5)
 plt.xlim(-5.5, 5.5)
@@ -112,26 +141,36 @@ plt.plot(DX, cen0, 'b-')
 plt.plot(DX, cen1, 'g-')
 plt.plot(DX, cen2, 'r-')
 plt.plot(DX, ceni, 'm-')
+plt.plot(DX, cenp, '-', color='0.5')
 ps.savefig()
 
 plt.clf()
+plt.plot(DX, cenu - DX, 'k-', label='Lanczos-3 (unnorm)')
 plt.plot(DX, cen0 - DX, 'b-', label='Lanczos-3')
 plt.plot(DX, cen1 - DX, 'g-', label='"fixed(1)"')
 plt.plot(DX, cen2 - DX, 'r-', label='"fixed(2)"')
 plt.plot(DX, ceni - DX, 'm-', label='"fixed(5)"')
+plt.plot(DX, cenp - DX, '-', color='0.5', label='"fixed(poly)"')
+plt.xlabel('subpixel offset (pixels)')
+plt.ylabel('centroid error (pixels)')
+plt.legend()
+ps.savefig()
+
+plt.clf()
+plt.plot(DX, cenp - DX, '-', color='0.5', label='"fixed(poly)"')
 plt.xlabel('subpixel offset (pixels)')
 plt.ylabel('centroid error (pixels)')
 plt.legend()
 ps.savefig()
 
 # Fit a polynomial expansion to fixed_xi
-NP = 10
-A = np.zeros((len(DX), NP+1))
-for i in range(NP+1):
-    A[:,i] = DX**i
-R = np.linalg.lstsq(A, fixed_xi - DX)
-poly = R[0]
-print('Fitting polynomial:', poly)
+# NP = 10
+# A = np.zeros((len(DX), NP+1))
+# for i in range(NP+1):
+#     A[:,i] = DX**i
+# R = np.linalg.lstsq(A, fixed_xi - DX)
+# poly = R[0]
+# print('Fitting polynomial:', poly)
 
 fipoly = np.zeros_like(DX)
 for i,a in enumerate(poly):
@@ -151,6 +190,7 @@ F5 = np.fft.rfft(lanczos5_kernel)
 F1 = np.fft.rfft(fixed_kernel)
 F2 = np.fft.rfft(fixed2_kernel)
 Fi = np.fft.rfft(fixedi_kernel)
+Fp = np.fft.rfft(fixedp_kernel)
 
 print(len(lanczos_kernel))
 
@@ -161,6 +201,7 @@ plt.plot(F1.real, 'g-')
 plt.plot(F2.real, 'r-')
 plt.plot(F5.real, 'm-')
 plt.plot(Fi.real, 'c-')
+plt.plot(Fp.real, '-', color='0.5')
 plt.xscale('log')
 plt.ylabel('Fourier transform (real)')
 plt.subplot(2,1,2)
@@ -169,6 +210,7 @@ plt.plot(F1.imag, 'g-')
 plt.plot(F2.imag, 'r-')
 plt.plot(F5.imag, 'm-')
 plt.plot(Fi.imag, 'c-')
+plt.plot(Fp.imag, '-', color='0.5')
 plt.xscale('log')
 plt.ylabel('Fourier transform (imag)')
 ps.savefig()
@@ -178,6 +220,7 @@ mag5 = np.hypot(F5.real, F5.imag)
 mag1 = np.hypot(F1.real, F1.imag)
 mag2 = np.hypot(F2.real, F2.imag)
 magi = np.hypot(Fi.real, Fi.imag)
+magp = np.hypot(Fp.real, Fp.imag)
 
 plt.clf()
 plt.plot(mag0, 'b-', label='Lanczos-3')
@@ -185,6 +228,7 @@ plt.plot(mag1, 'g-')
 plt.plot(mag2, 'r-', label='"fixed"(2)')
 plt.plot(magi, 'c-', label='"fixed"(5)')
 plt.plot(mag5, 'm-', label='Lanczos-5')
+plt.plot(magp, '-', color='0.5', label='Fixed-poly')
 plt.xscale('log')
 plt.yscale('log')
 plt.ylabel('abs Fourier transform')

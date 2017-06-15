@@ -22,10 +22,12 @@ h,w  = 49,49
 xx,yy = np.meshgrid(np.arange(w), np.arange(h))
 
 #N1 = N2 = 25
-N1 = 25
-N2 = 23
+#N1 = 25
+#N2 = 23
+N1 = 5
+N2 = 11
 
-alanczos = False
+alanczos = True
 
 ocen  = np.zeros((N1,N2))
 odcen = np.zeros((N1,N2))
@@ -41,8 +43,11 @@ isecen = np.zeros(N1)
 isewcen = np.zeros(N1)
 itcen = np.zeros(N1)
 
-OX = np.linspace(0, 2, N1)
-DX = np.linspace(0, 2, N2)
+#OX = np.linspace(0, 2, N1)
+#DX = np.linspace(0, 2, N2)
+
+OX = np.linspace(0, 1, N1)
+DX = np.linspace(0, 1, N2)
 
 cx,cy = w//2, h//2
 print('cx', cx)
@@ -82,7 +87,10 @@ for ii,ox in enumerate(OX):
     # run the tractor on the input image
     tim = Image(data=img, inverr=np.ones_like(img),
                 psf=NCircularGaussianPSF([sig],[1.]))
-    src = PointSource(PixPos(cx, cy), Flux(1.))
+    pos = PixPos(cx,cy)
+    pos.stepsizes = [1e-3, 1e-3]
+    pos.symmetric_derivs = True
+    src = PointSource(pos, Flux(1.))
     tractor = Tractor([tim], [src])
     tractor.freezeParam('images')
     tractor.optimize_loop()
@@ -115,9 +123,33 @@ for ii,ox in enumerate(OX):
         outfn = 'coadd.fits'
         coimg = fitsio.read(outfn)
 
+        shiftedimg = np.exp(-0.5 * ((xx - (cx+ox+dx))**2 + (yy - cy)**2) / sig**2)
+        # Visually they look the same
+        # plt.clf()
+        # plt.imshow(coimg/coimg.sum(), interpolation='nearest', origin='lower')
+        # plt.colorbar()
+        # plt.title('coimg: dx %f' % dx)
+        # ps.savefig()
+        # 
+        # plt.clf()
+        # plt.imshow(shiftedimg/shiftedimg.sum(), interpolation='nearest', origin='lower')
+        # plt.colorbar()
+        # plt.title('shifted: dx %f' % dx)
+        # ps.savefig()
+        
+        # plt.clf()
+        # plt.imshow(coimg/coimg.sum() - shiftedimg/shiftedimg.sum(), interpolation='nearest', origin='lower')
+        # plt.colorbar()
+
+        print('Centroid of image differences:',
+              np.sum(xx * (coimg/coimg.sum() - shiftedimg/shiftedimg.sum())))
+        
+        # plt.title('co-shifted: dx %f (Gaussian max: %f)' % (dx, (coimg/coimg.sum()).max()))
+        # ps.savefig()
+        
         outsum = np.sum(coimg)
         ocen[ii,jj] = np.sum(xx * coimg) / outsum
-
+        
         # Run Blanton's dcen3x3 routine on the un-smoothed image
         peak = np.argmax(coimg)
         py,px = np.unravel_index(peak, coimg.shape)
@@ -147,27 +179,47 @@ for ii,ox in enumerate(OX):
         otcen[ii,jj] = src.pos.x
         
 
-plt.clf()
-plt.plot(OX, icen, 'b-', label='Input centroid')
-plt.plot(OX, idcen, 'r-', label='Input dcen3x3')
-plt.plot(OX, isecen, 'g-', label='Input SE x_image')
-plt.plot(OX, isewcen, 'm-', label='Input SE xwin_image')
-plt.plot(OX, itcen, 'c-', label='Input tractor pos')
-plt.xlabel('Input subpixel center')
-plt.ylabel('Input measured centroid')
-plt.legend(loc='upper left')
-ps.savefig()
+# plt.clf()
+# plt.plot(OX, icen, 'b-', label='Input centroid')
+# plt.plot(OX, idcen, 'r-', label='Input dcen3x3')
+# plt.plot(OX, isecen, 'g-', label='Input SE x_image')
+# plt.plot(OX, isewcen, 'm-', label='Input SE xwin_image')
+# plt.plot(OX, itcen, 'c-', label='Input tractor pos')
+# plt.xlabel('Input subpixel center')
+# plt.ylabel('Input measured centroid')
+# plt.legend(loc='upper left')
+# ps.savefig()
 
 plt.clf()
-plt.plot(OX, icen-(OX+cx), 'b-', label='Input centroid')
-plt.plot(OX, idcen-(OX+cx), 'r-', label='Input dcen3x3')
-plt.plot(OX, isecen-(OX+cx), 'g-', label='Input SE x_image')
-plt.plot(OX, isewcen-(OX+cx), 'm-', label='Input SE xwin_image')
-plt.plot(OX, itcen-(OX+cx), 'm-', label='Input tractor pos')
+plt.plot(OX, icen-(OX+cx), 'b-', label='Input centroid (max %.1g)' %
+         (np.max(np.abs(icen-(OX+cx)))))
+plt.plot(OX, idcen-(OX+cx), 'r-', label='Input dcen3x3 (max %.1g)' %
+         (np.max(np.abs(idcen-(OX+cx)))))
+plt.plot(OX, isecen-(OX+cx), 'g-', label='Input SE x_image (max %.1g)' %
+         (np.max(np.abs(isecen-(OX+cx)))))
+plt.plot(OX, isewcen-(OX+cx), 'm-', label='Input SE xwin_image (max %.1g)' %
+         (np.max(np.abs(isewcen-(OX+cx)))))
+plt.plot(OX, itcen-(OX+cx), 'm-', label='Input tractor pos (max %.1f)' %
+         (np.max(np.abs(itcen-(OX+cx)))))
 plt.xlabel('Input subpixel center')
 plt.ylabel('Input measured centroid error')
 plt.legend(loc='upper left')
 ps.savefig()
+
+
+# plt.clf()
+# plt.plot(OX, icen-(OX+cx), 'b-', label='Input centroid')
+# #plt.plot(OX, idcen-(OX+cx), 'r-', label='Input dcen3x3')
+# plt.plot(OX, isecen-(OX+cx), 'g-', label='Input SE x_image')
+# plt.plot(OX, isewcen-(OX+cx), 'm-', label='Input SE xwin_image')
+# plt.plot(OX, itcen-(OX+cx), 'm-', label='Input tractor pos')
+# plt.xlabel('Input subpixel center')
+# plt.ylabel('Input measured centroid error')
+# plt.legend(loc='upper left')
+# ps.savefig()
+
+#plt.yscale('symlog')
+#ps.savefig()
 
 plt.clf()
 plt.imshow(ocen, interpolation='nearest', origin='lower',

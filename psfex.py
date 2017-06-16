@@ -1,4 +1,8 @@
 from __future__ import print_function
+
+import matplotlib
+matplotlib.use('Agg')
+
 import os
 import numpy as np
 import fitsio
@@ -19,13 +23,15 @@ sig = 3.
 
 N = 10
 
+yvals = np.linspace(0, h, N+1)
+yvals = (yvals[:-1] + yvals[1:])/2.
+xvals = np.linspace(0, w, N+1)
+xvals = (xvals[:-1] + xvals[1:])/2.
+
 for randomize in [False, True]:
     img = np.zeros((h,w), np.float32)
-    for y in np.linspace(0, h, N):
-        y += 0.5*h/N
-        for x in np.linspace(0, w, N):
-            x += 0.5*w/N
-        
+    for y in yvals:
+        for x in xvals:
             if randomize:
                 y += np.rand.uniform(-0.5, +0.5)
                 x += np.rand.uniform(-0.5, +0.5)
@@ -53,6 +59,7 @@ for randomize in [False, True]:
     # se2.conf : PHOT_APERTURES
 
     cmd = 'psfex -c psfex.conf se.fits -PSF_SUFFIX .psfex'
+    print('Running:', cmd)
     rtn = os.system(cmd)
 
     print('Return:', rtn)

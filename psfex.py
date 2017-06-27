@@ -11,6 +11,7 @@ from astrometry.util.run_command import run_command
 import pylab as plt
 from tractor import *
 
+import photutils
 
 ps = PlotSequence('dx')
 
@@ -41,7 +42,6 @@ container = '2b6b936ffec5981b9d0aaea5073878578e651597e7a3374152f70c5ac368bb29'
 # rtn = os.system(cmd)
 # print('rtn', rtn)
 
-
 # integers
 dy = h // N
 dx = w // N
@@ -50,6 +50,11 @@ X = dx//2 + dx * np.arange(N)
 
 #xx,yy = np.meshgrid(np.arange(-dx//2, dx//2+1), np.arange(-dy//2, dy//2+1))
 xx,yy = np.meshgrid(np.arange(-dx//2, dx//2), np.arange(-dy//2, dy//2))
+
+flags = np.zeros((h,w), np.int16)
+fitsio.write('flag.fits', flags, clobber=True)
+
+cogs = []
 
 for randomize in [False, True]:
     img = np.zeros((h,w), np.float32)
@@ -70,14 +75,10 @@ for randomize in [False, True]:
     plt.imshow(img, interpolation='nearest', origin='lower')
     ps.savefig()
 
-    flags = np.zeros((h,w), np.int16)
-    fitsio.write('flag.fits', flags, clobber=True)
-    
     fitsio.write('input1.fits', img, clobber=True)
 
     # run source extractor on the input image
     cmd = 'sex -c se2.conf input1.fits'
-    #cmd = 'sex -c DECaLS.se input1.fits'
     
     rtn = os.system(cmd)
     #print('Return:', rtn)
@@ -88,15 +89,13 @@ for randomize in [False, True]:
     #T = fits_table('se.fits')
     T = fits_table('se.fits', ext=2)
     N = T.vignet.shape[0]
-    print('Vignette range', T.vignet.max())
-    for i in range(N):
-        plt.clf()
+    #print('Vignette range', T.vignet.max())
+    plt.clf()
+    for i in range(9):
+        plt.subplot(3, 3, i+1)
         plt.imshow(T.vignet[i,:,:], interpolation='nearest', origin='lower', vmin=-0.1, vmax=1.0)
-        plt.colorbar()
-        #plt.savefig('/tmp/v%02i.png' % i)
-        ps.savefig()
-        print('Wrote vignette', i)
-        break
+    plt.suptitle('Vignettes')
+    ps.savefig()
         
     # run psfex on the SE catalog
 
@@ -105,17 +104,13 @@ for randomize in [False, True]:
 
     # se2.conf : PHOT_APERTURES
 
-    for fn in [
-        'psfex.conf', 
-        # 'psfex-default.conf',
-        'se.fits']:
+    for fn in ['psfex.conf', 'se.fits']:
         cmd = 'docker cp %s %s:/' % (fn, container)
         print(cmd)
         rtn = os.system(cmd)
         print('rtn', rtn)
 
-    cmd = 'psfex -c psfex.conf se.fits -PSF_SUFFIX .psfex'
-    #cmd = 'psfex -c psfex-default.conf se.fits -PSF_SUFFIX .psfex'
+    cmd = 'psfex -c psfex.conf se.fits' # -PSF_SUFFIX .psfex'
     cmd = 'docker exec %s %s' % (container, cmd)
     print(cmd)
     rtn = os.system(cmd)
@@ -127,3 +122,47 @@ for randomize in [False, True]:
     print('Return:', rtn)
     assert(rtn == 0)
 
+    for fn in ['se.psfex']:
+        cmd = 'docker cp %s:/%s .' % (container, fn)
+        print(cmd)
+        rtn = os.system(cmd)
+        print('rtn', rtn)
+    
+    T = fits_table('se.psfex')
+    psf = T.psf_mask[0]
+    print('PSF model:', psf.shape)
+
+    N,ph,pw = psf.shape
+
+    for i in range(N):
+        plt.clf()
+        plt.imshow(psf[i,:,:], interpolation='nearest', origin='lower')
+        plt.title('PSF component %i' % i)
+        plt.colorbar()
+        ps.savefig()
+
+    cog = []
+    cog_radius = np.arange(0.5, 15.5, 0.5)
+    for r in cog_radius:
+        aper = photutils.CircularAperture(np.array([[pw//2, ph//2]]), r)
+        p = photutils.aperture_photometry(psf[0,:,:], aper)
+        #print('Ap-phot result:', p)
+        #ap = p.field('aperture_sum')
+        #print('ap', ap)
+        cog.append(p.field('aperture_sum')[0])
+    cogs.append(cog)
+
+    plt.clf()
+    plt.plot(cog_radius, cog, 'b-')
+    plt.xlabel('radius')
+    plt.ylabel('PSF component 0 aperture flux')
+    ps.savefig()
+
+plt.clf()
+plt.plot(cog_radius, cogs[0], 'b-', label='Centered PSFs')
+plt.plot(cog_radius, cogs[1], 'r-', label='Randomly scattered PSFs')
+plt.xlabel('radius')
+plt.ylabel('PSF component 0 aperture flux')
+ps.savefig()
+
+    

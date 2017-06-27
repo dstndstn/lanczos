@@ -15,11 +15,15 @@ from tractor import *
 ps = PlotSequence('dx')
 
 # input image
-h,w  = 200,200
-xx,yy = np.meshgrid(np.arange(w), np.arange(h))
+#h,w  = 200,200
+h,w  = 500,500
+#h,w  = 1000,1000
 sig = 2.
+# per-pix noise
+sig1 = 0.001
 
-N = 10
+
+N = 20
 
 container = '2b6b936ffec5981b9d0aaea5073878578e651597e7a3374152f70c5ac368bb29'
 
@@ -38,36 +42,51 @@ container = '2b6b936ffec5981b9d0aaea5073878578e651597e7a3374152f70c5ac368bb29'
 # print('rtn', rtn)
 
 
+# integers
+dy = h // N
+dx = w // N
+Y = dy//2 + dy * np.arange(N)
+X = dx//2 + dx * np.arange(N)
+
+#xx,yy = np.meshgrid(np.arange(-dx//2, dx//2+1), np.arange(-dy//2, dy//2+1))
+xx,yy = np.meshgrid(np.arange(-dx//2, dx//2), np.arange(-dy//2, dy//2))
+
 for randomize in [False, True]:
     img = np.zeros((h,w), np.float32)
-    for y in np.linspace(0, h, N):
-        y += 0.5*h/N
-        for x in np.linspace(0, w, N):
-            x += 0.5*w/N
-        
+    for y in Y:
+        for x in X:
+            cx,cy = x,y
             if randomize:
-                y += np.rand.uniform(-0.5, +0.5)
-                x += np.rand.uniform(-0.5, +0.5)
-
-            img += np.exp(-0.5 * ((xx - x)**2 + (yy - y)**2) / sig**2)
-
-    img += np.random.normal(scale=0.01, size=img.shape)
+                cy += np.random.uniform(-0.5, +0.5)
+                cx += np.random.uniform(-0.5, +0.5)
+            sh,sw = yy.shape
+            y0,x0 = y-dy//2, x-dx//2
+            img[y0:y0+sh, x0:x0+sw] += np.exp(-0.5 * ((cx - (xx+x))**2 + (cy - (yy+y))**2) / sig**2)
+            
+    img += np.random.normal(scale=sig1, size=img.shape)
     img += 1.
     
     plt.clf()
     plt.imshow(img, interpolation='nearest', origin='lower')
     ps.savefig()
 
+    flags = np.zeros((h,w), np.int16)
+    fitsio.write('flag.fits', flags, clobber=True)
+    
     fitsio.write('input1.fits', img, clobber=True)
 
     # run source extractor on the input image
     cmd = 'sex -c se2.conf input1.fits'
+    #cmd = 'sex -c DECaLS.se input1.fits'
+    
     rtn = os.system(cmd)
     #print('Return:', rtn)
     # -> se.fits
     assert(rtn == 0)
 
-    T = fits_table('se.fits')
+    # FITS_LDAC
+    #T = fits_table('se.fits')
+    T = fits_table('se.fits', ext=2)
     N = T.vignet.shape[0]
     print('Vignette range', T.vignet.max())
     for i in range(N):
@@ -86,7 +105,10 @@ for randomize in [False, True]:
 
     # se2.conf : PHOT_APERTURES
 
-    for fn in ['psfex.conf', 'psfex-default.conf', 'se.fits']:
+    for fn in [
+        'psfex.conf', 
+        # 'psfex-default.conf',
+        'se.fits']:
         cmd = 'docker cp %s %s:/' % (fn, container)
         print(cmd)
         rtn = os.system(cmd)

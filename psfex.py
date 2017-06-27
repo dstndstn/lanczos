@@ -17,12 +17,11 @@ ps = PlotSequence('dx')
 
 # input image
 #h,w  = 200,200
-h,w  = 500,500
-#h,w  = 1000,1000
+#h,w  = 500,500
+h,w  = 1000,1000
 sig = 2.
 # per-pix noise
-sig1 = 0.001
-
+sig1 = 0.000001
 
 N = 20
 
@@ -122,7 +121,10 @@ for randomize in [False, True]:
     print('Return:', rtn)
     assert(rtn == 0)
 
-    for fn in ['se.psfex']:
+    for fn in ['se.psfex', 'snap_imres_se.fits', 'chi_se.fits', 'snap_se.fits',
+               'samp_se.fits', 'resi_se.fits', 'proto_se.fits',
+        #'residuals_se.ps', 'chi2_se.ps'
+        ]:
         cmd = 'docker cp %s:/%s .' % (container, fn)
         print(cmd)
         rtn = os.system(cmd)
@@ -136,11 +138,24 @@ for randomize in [False, True]:
 
     for i in range(N):
         plt.clf()
-        plt.imshow(psf[i,:,:], interpolation='nearest', origin='lower')
+        if i == 0:
+            plt.imshow(psf[i,:,:], interpolation='nearest', origin='lower')
+        else:
+            mx = np.max(np.abs(psf[i,:,:]))
+            plt.imshow(psf[i,:,:], interpolation='nearest', origin='lower',
+                       vmin=-mx, vmax=mx)
         plt.title('PSF component %i' % i)
         plt.colorbar()
         ps.savefig()
 
+    for fn in ['resi_se.fits', 'chi_se.fits']:
+        imxx = fitsio.read(fn)
+        plt.clf()
+        plt.imshow(imxx, interpolation='nearest', origin='lower')
+        plt.colorbar()
+        plt.title('%s' % fn)
+        ps.savefig()
+        
     cog = []
     cog_radius = np.arange(0.5, 15.5, 0.5)
     for r in cog_radius:

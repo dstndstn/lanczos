@@ -1,4 +1,8 @@
 from __future__ import print_function
+
+import matplotlib
+matplotlib.use('Agg')
+
 import os
 import numpy as np
 import fitsio
@@ -109,7 +113,7 @@ for randomize in [False, True]:
         rtn = os.system(cmd)
         print('rtn', rtn)
 
-    cmd = 'psfex -c psfex.conf se.fits' # -PSF_SUFFIX .psfex'
+    cmd = 'psfex -c psfex.conf se.fits'
     cmd = 'docker exec %s %s' % (container, cmd)
     print(cmd)
     rtn = os.system(cmd)

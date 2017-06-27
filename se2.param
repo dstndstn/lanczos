@@ -1,17 +1,18 @@
 VIGNET(15,15)
+#VIGNET(25,25)
 
-FLUX_APER(1)
-FLUXERR_APER(1)
+FLUX_APER(2)
+FLUXERR_APER(2)
 
 BACKGROUND         #      Background at centroid position                           [count]
 XPEAK_IMAGE        #      x-coordinate of the brightest pixel                       [pixel]
 YPEAK_IMAGE        #      y-coordinate of the brightest pixel                       [pixel]
-ALPHAPEAK_J2000    #      Right ascension of brightest pix (J2000)                  [deg]
-DELTAPEAK_J2000    #      Declination of brightest pix (J2000)                      [deg]
+##ALPHAPEAK_J2000    #      Right ascension of brightest pix (J2000)                  [deg]
+##DELTAPEAK_J2000    #      Declination of brightest pix (J2000)                      [deg]
 X_IMAGE            #      Object position along x                                   [pixel]
 Y_IMAGE            #      Object position along y                                   [pixel]
-ALPHA_J2000        #      Right ascension of barycenter (J2000)                     [deg]
-DELTA_J2000        #      Declination of barycenter (J2000)                         [deg]
+##ALPHA_J2000        #      Right ascension of barycenter (J2000)                     [deg]
+##DELTA_J2000        #      Declination of barycenter (J2000)                         [deg]
 #X2_IMAGE                 Variance along x                                          [pixel**2]
 #Y2_IMAGE                 Variance along y                                          [pixel**2]
 #XY_IMAGE                 Covariance between x and y                                [pixel**2]
@@ -55,8 +56,8 @@ DELTA_J2000        #      Declination of barycenter (J2000)                     
 
 XWIN_IMAGE      #         Windowed position estimate along x                        [pixel]
 YWIN_IMAGE      #         Windowed position estimate along y                        [pixel]
-ALPHAWIN_J2000  #         Windowed right ascension (J2000)                          [deg]
-DELTAWIN_J2000  #         windowed declination (J2000)                              [deg]
+## ALPHAWIN_J2000  #         Windowed right ascension (J2000)                          [deg]
+## DELTAWIN_J2000  #         windowed declination (J2000)                              [deg]
 #X2WIN_IMAGE              Windowed variance along x                                 [pixel**2]
 #Y2WIN_IMAGE              Windowed variance along y                                 [pixel**2]
 #XYWIN_IMAGE              Windowed covariance between x and y                       [pixel**2]

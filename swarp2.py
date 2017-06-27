@@ -15,10 +15,12 @@ then also resampling by a fraction of a pixel (in the same dimension),
 and measuring the dcen3x3 centroid.
 '''
 
-ps = PlotSequence('dx')
+ps = PlotSequence('sw2')
 
 # input image
 h,w  = 49,49
+#h,w  = 25,25
+#h,w  = 15,15
 xx,yy = np.meshgrid(np.arange(w), np.arange(h))
 
 #N1 = N2 = 25
@@ -27,7 +29,8 @@ xx,yy = np.meshgrid(np.arange(w), np.arange(h))
 N1 = 5
 N2 = 11
 
-alanczos = True
+#alanczos = True
+alanczos = False
 
 ocen  = np.zeros((N1,N2))
 odcen = np.zeros((N1,N2))
@@ -54,8 +57,12 @@ print('cx', cx)
 for ii,ox in enumerate(OX):
     print('Gaussian centered at', ox, ', ', ii+1, 'of', len(OX))
     sig = 3.
+    #sig = 4.
+    #sig = 2.5
     img = np.exp(-0.5 * ((xx - (cx+ox))**2 + (yy - cy)**2) / sig**2)
 
+    #img += np.random.normal(size=img.shape)*0.001
+    
     pixscale = 0.1
     cd = pixscale / 3600.
 
@@ -73,6 +80,11 @@ for ii,ox in enumerate(OX):
 
     fitsio.write('input1.fits', img, clobber=True)
 
+    # plt.clf()
+    # plt.imshow(img, interpolation='nearest', origin='lower')
+    # plt.title('Input: ox=%g' % ox)
+    # ps.savefig()
+    
     # run source extractor on the input image
     cmd = 'sex -c se.conf input1.fits'
     rtn = os.system(cmd)
@@ -80,6 +92,7 @@ for ii,ox in enumerate(OX):
     # -> se.fits
     assert(rtn == 0)
     T = fits_table('se.fits')
+    #print(len(T), 'sources')
     assert(len(T) == 1)
     isecen[ii] = T.x_image[0] - 1.
     isewcen[ii] = T.xwin_image[0] - 1.
@@ -115,7 +128,7 @@ for ii,ox in enumerate(OX):
             resamp = 'ALANCZOS3'
         else:
             resamp = 'LANCZOS3'
-        cmd = 'swarp -c swarp.conf -RESAMPLING_TYPE %s input1.fits' % resamp
+        cmd = 'swarp -c swarp.conf -RESAMPLING_TYPE %s -IMAGE_SIZE %i,%i input1.fits' % (resamp, w, h)
         rtn = os.system(cmd)
         #print('Return:', rtn)
         assert(rtn == 0)
@@ -123,6 +136,11 @@ for ii,ox in enumerate(OX):
         outfn = 'coadd.fits'
         coimg = fitsio.read(outfn)
 
+        # plt.clf()
+        # plt.imshow(coimg, interpolation='nearest', origin='lower')
+        # plt.title('Resampled: ox=%g, dx=%g' % (ox,dx))
+        # ps.savefig()
+        
         shiftedimg = np.exp(-0.5 * ((xx - (cx+ox+dx))**2 + (yy - cy)**2) / sig**2)
         # Visually they look the same
         # plt.clf()
@@ -141,8 +159,8 @@ for ii,ox in enumerate(OX):
         # plt.imshow(coimg/coimg.sum() - shiftedimg/shiftedimg.sum(), interpolation='nearest', origin='lower')
         # plt.colorbar()
 
-        print('Centroid of image differences:',
-              np.sum(xx * (coimg/coimg.sum() - shiftedimg/shiftedimg.sum())))
+        # print('Centroid of image differences:',
+        #       np.sum(xx * (coimg/coimg.sum() - shiftedimg/shiftedimg.sum())))
         
         # plt.title('co-shifted: dx %f (Gaussian max: %f)' % (dx, (coimg/coimg.sum()).max()))
         # ps.savefig()
@@ -162,9 +180,11 @@ for ii,ox in enumerate(OX):
 
         # run source extractor on the output (resampled) image
         cmd = 'sex -c se.conf %s' % outfn
+        #print(cmd)
         rtn = os.system(cmd)
         assert(rtn == 0)
         T = fits_table('se.fits')
+        #print(len(T), 'sources in resampled')
         assert(len(T) == 1)
         osecen [ii,jj] = T.x_image   [0] - 1.
         osewcen[ii,jj] = T.xwin_image[0] - 1.
@@ -262,12 +282,12 @@ else:
 plt.legend(loc='upper right')
 ps.savefig()
     
-plt.clf()
-plt.imshow(odcen - ocen, interpolation='nearest', origin='lower',
-           extent=[DX.min(), DX.max(), OX.min(), OX.max()],
-           cmap='RdBu')
-plt.xlabel('subpixel shift')
-plt.ylabel('input subpixel center')
-plt.title('Lanczos-shifted dcen3x3 - Lanczos-shifted centroid')
-plt.colorbar()
-ps.savefig()
+# plt.clf()
+# plt.imshow(odcen - ocen, interpolation='nearest', origin='lower',
+#            extent=[DX.min(), DX.max(), OX.min(), OX.max()],
+#            cmap='RdBu')
+# plt.xlabel('subpixel shift')
+# plt.ylabel('input subpixel center')
+# plt.title('Lanczos-shifted dcen3x3 - Lanczos-shifted centroid')
+# plt.colorbar()
+# ps.savefig()
